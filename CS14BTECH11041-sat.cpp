@@ -16,6 +16,7 @@ void input(boolean_formula& cnf)
         getline(cin,s);
         if (s[0]=='p') break; 
     }
+
     stringstream ss(s);
     string p, _cnf;int m;
     ss>>p>>_cnf>>N>>m;
@@ -45,29 +46,35 @@ bool unit_resolution(boolean_formula& cnf, vi& literals)
     for (int i=1; i<=N; ++i) seen[i]=false;
 
     int i=-1;
+
     for (auto it=cnf.begin(), stop=cnf.end(); it!=stop; ++it) {
+
         if ((*it).size()==1 and !seen[abs(*it->begin())]) 
             q.push(*it->begin()), seen[abs(*it->begin())]=true;
+
         tmp[++i] = it;
+
         for (auto& x: *it)
             v[abs(x)].pb(&tmp[i]);
     }
 
     while(!q.empty()) {
+
         auto x=q.front();
         q.pop();
         literals.pb(x);
 
         for (auto it=v[abs(x)].begin(), stop=v[abs(x)].end(); it!=stop; ++it) {
-            // *it   : pointer to an iterator to a clause
-            // **it  : an iterator to a clause
-            // ***it : a clause
-            if (**it == cnf.end()) continue;
-            (**it)->erase(-x);
-            if ((**it)->count(x)) cnf.erase(**it), **it = cnf.end();
-            else if ((**it)->size()==0) return false;
-            else if ((**it)->size()==1 and !seen[abs(*((**it)->begin()))]) 
-                q.push(*((**it)->begin())), seen[abs(*((**it)->begin()))]=true;
+
+            auto& c = **it;
+
+            if (c == cnf.end()) continue;
+
+            c->erase(-x);
+            if (c->count(x)) cnf.erase(c), c = cnf.end();
+            else if (c->size()==0) return false;
+            else if (c->size()==1 and !seen[abs(*(c->begin()))]) 
+                q.push(*(c->begin())), seen[abs(*(c->begin()))]=true;
         } 
     }
 
@@ -119,8 +126,10 @@ int main()
 {
     boolean_formula cnf;
     input(cnf);
+    cout<<N<<endl;
     vi v;
     if (solve(move(cnf), v)) {
+        cout<<"SAT\n";
         sort(v.begin(), v.end(), foo);
         int i=1;
         for (auto it=v.begin(); it!=v.end(); ++it, ++i) {
