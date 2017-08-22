@@ -17,6 +17,7 @@ vector<set<int>> Literals;
 vector<vector<int>> clauses;
 
 bool is_satisfied[M];
+bool is_assigned[N];
 
 int n, m;
 int n_active_clause;
@@ -50,7 +51,7 @@ void input()
     }
 }
 
-bool unit_resolution(vi& res, vi& removed, map<int, list<int>>& erased)
+bool unit_resolution(vi& res, vi& removed, vi& assigned, map<int, list<int>>& erased)
 {
     queue<int> q;
 
@@ -68,6 +69,8 @@ bool unit_resolution(vi& res, vi& removed, map<int, list<int>>& erased)
         auto j=q.front();
         q.pop();
         res.pb(j);
+        is_assigned[abs(j)]=true;
+        assigned.pb(abs(j));
 
         for (auto i: clauses[abs(j)]) {
 
@@ -89,7 +92,7 @@ bool unit_resolution(vi& res, vi& removed, map<int, list<int>>& erased)
     return true;
 }
 
-void condition(int l, vi& removed, map<int, list<int>>& erased)
+void condition(int l, vi& removed, vi& assigned, map<int, list<int>>& erased)
 {
     for (auto i: clauses[abs(l)]) {
         if (is_satisfied[abs(i)]) continue;
@@ -100,12 +103,17 @@ void condition(int l, vi& removed, map<int, list<int>>& erased)
             erased[-l].pb(i), Literals[i].erase(-l);
         }
     }
+    is_assigned[abs(l)]=true;
+    assigned.pb(abs(l));
 }
 
-void backtrack(vi& removed, map<int, list<int>>& erased)
+void backtrack(vi& removed, vi& assigned, map<int, list<int>>& erased)
 {
     for (auto i: removed)
         is_satisfied[i]=false, ++n_active_clause;
+
+    for (auto i: assigned)
+        is_assigned[i]=false;
 
     for (auto& x: erased)
         for (auto& i: x.ss)
@@ -118,32 +126,67 @@ int choose_literal()
         if (!is_satisfied[i]) return *Literals[i].begin();
 }
 
+int eliminate_pure_literal(vi& removed, vi& assigned, map<int, list<int>>& erased)
+{
+    int max_cover=0, var=-1, pol=0;
+    for (int i=1; i<=n; ++i) {
+        if (is_assigned[i]) continue;
+        int pos=0, neg=0;
+        for (auto& x: clauses[i]) {
+            if (is_satisfied[abs(x)]) continue;
+            if (x<0) ++neg;
+            else ++pos;
+        }
+        if (!neg or !pos) {
+            if(pos+neg > max_cover) max_cover=pos+neg, var=i, pol=(pos?1:-1);
+        }
+    }
+
+    if(!max_cover) return 0;
+
+    for (auto& x: clauses[var])
+        if (!is_satisfied[abs(x)])  {
+            //Literals[abs(x)].erase(var*pol), erased[var*pol].pb(abs(x));
+            is_satisfied[abs(x)]=true, --n_active_clause, removed.pb(abs(x));
+        }
+    is_assigned[var]=true;
+    assigned.pb(var);
+    return pol*var;
+}
+
 bool solve(vi&, int d);
 
 bool solve_branch(int l, vi& I, int d)
 {
     vi _I;
-    vi removed_cond;
-    map<int, list<int>> erased_cond;
+    vi removed, assigned;
+    map<int, list<int>> erased;
 
-    condition(l, removed_cond, erased_cond);
+    condition(l, removed, assigned, erased);
     if (solve(_I, d)) {
         I.insert(I.end(), _I.begin(), _I.end());
         I.pb(l);
         return true;
     }
 
-    backtrack(removed_cond, erased_cond);
+    backtrack(removed, assigned, erased);
     return false;
 }
 
 bool solve(vi& I, int d=1)
 {
-    vi removed_unit;
-    map<int, list<int>> erased_unit;
+    vi removed, assigned;
+    map<int, list<int>> erased;
 
-    if (!unit_resolution(I, removed_unit, erased_unit)) {
-        backtrack(removed_unit, erased_unit);
+    
+    int pure_literal;
+    if ((pure_literal=eliminate_pure_literal(removed, assigned, erased))!=0) {
+        I.pb(pure_literal);
+    }
+        
+
+    if (!unit_resolution(I, removed, assigned, erased)) {
+        backtrack(removed, assigned, erased);
         return false;
     }
 
@@ -159,7 +202,7 @@ bool solve(vi& I, int d=1)
         return true;
     }
 
-    backtrack(removed_unit, erased_unit);
+    backtrack(removed, assigned, erased);
     return false;
 }
 
