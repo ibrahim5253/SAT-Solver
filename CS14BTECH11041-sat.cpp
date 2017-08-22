@@ -10,8 +10,6 @@ int const M = 10001;
 
 using namespace std;
 using vi=vector<int>;
-//using clause=set<int>;
-//using boolean_formula=list<clause>;
 
 vector<set<int>> Literals;
 vector<vector<int>> clauses;
