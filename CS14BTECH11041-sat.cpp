@@ -2,14 +2,22 @@
 
 #define pb push_back
 
+int const N = 501;
+int const M = 10001;
+
 using namespace std;
 using vi=vector<int>;
 using clause=set<int>;
 using boolean_formula=list<clause>;
 
-int N;
+vector<bitset<N>> literals;
+//vector<bitset<M>> clauses;
 
-void input(boolean_formula& cnf) 
+int clause_state[M];
+
+int n, m;
+
+void input() 
 {
     string s;
     while(1) {
@@ -18,51 +26,42 @@ void input(boolean_formula& cnf)
     }
 
     stringstream ss(s);
-    string p, _cnf;int m;
-    ss>>p>>_cnf>>N>>m;
+    string p, _cnf;
+    ss>>p>>_cnf>>n>>m;
 
-    for (int i=0; i<m; ++i) {
+    literals.resize(2*m+1, bitset<N>()),
+//    clauses.resize(2*n+1, bitset<M>());
+
+    for (int i=1; i<=m; ++i) {
         getline(cin,s);
         if (s[0]=='c') {--i; continue;}
-        clause C;
         stringstream ss(s);
         int j; ss>>j;
-        while(j!=0) 
-            C.insert(j), ss>>j;
-        cnf.pb(move(C));
+        while(j!=0) {
+            if (j<0) literals[(i<<1)-1][-j]=1;//, clauses[(-j<<1)-1][i]=1;
+            else literals[i<<1][j]=1;//, clauses[j<<1][i]=1;
+            ss>>j;
+        }
     }
 }
 
-bool unit_resolution(boolean_formula& cnf, vi& literals)
+bool unit_resolution(boolean_formula& cnf, vi& res)
 {
     queue<int> q;
 
-    int nc = cnf.size();
-
-    vector<list<boolean_formula::iterator*>> v(N+1);
-    vector<boolean_formula::iterator> tmp(nc);
-
-    bool seen[N+1];
-    for (int i=1; i<=N; ++i) seen[i]=false;
-
-    int i=-1;
-
-    for (auto it=cnf.begin(), stop=cnf.end(); it!=stop; ++it) {
-
-        if ((*it).size()==1 and !seen[abs(*it->begin())]) 
-            q.push(*it->begin()), seen[abs(*it->begin())]=true;
-
-        tmp[++i] = it;
-
-        for (auto& x: *it)
-            v[abs(x)].pb(&tmp[i]);
+    for (int i=1; i<=m; ++i) {
+       if (literals[(i<<1)-1].count()+literals[i<<1].count()==1) 
+           for (int j=1; j<=n; ++j) {
+               if (literals[(i<<1)-1][j]) q.push(-j);
+               else if (literals[i<<1][j]) q.push(j);
+           }
     }
 
     while(!q.empty()) {
 
         auto x=q.front();
         q.pop();
-        literals.pb(x);
+        res.pb(x);
 
         for (auto it=v[abs(x)].begin(), stop=v[abs(x)].end(); it!=stop; ++it) {
 
