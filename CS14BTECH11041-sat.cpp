@@ -78,9 +78,6 @@ void input()
     }
 
     for (int i=1; i<=n; ++i)
-        unassigned_vars.insert(i);
-    
-    for (int i=1; i<=n; ++i)
         decision_level[i]=-1;
 }
 
@@ -97,7 +94,6 @@ bool assign(int x)
     cout<<"Assigning literal "<<x<<endl;
 #endif
     var_status[mod(x)] = (x>0?1:-1);
-    unassigned_vars.erase(mod(x));
     auto affected_clauses = being_watched[mod(x)][x<0];
 
     bool flag=true;
@@ -110,8 +106,10 @@ bool assign(int x)
         int k = clauses[c].size();
         auto& cl = clauses[c];
         
+        /*
         if (var_status[mod(cl[p1])]*cl[p1] < 0 and var_status[mod(cl[p2])]*cl[p2] < 0) {
         }
+        */
         if (cl[p1]==-x) {
             p1=(p2+1)%k;
             while (p1!=p2 and var_status[mod(cl[p1])]*cl[p1] < 0)
@@ -122,6 +120,7 @@ bool assign(int x)
             while (p1!=p2 and var_status[mod(cl[p2])]*cl[p2] < 0)
                 p2=(p2+1)%k;
         }
+
         if (p1==p2) {
             if (var_status[mod(cl[p1])]==0) {
 #ifdef DEBUG
@@ -255,39 +254,37 @@ int conflict_analysis()
     return beta;
 }
 
-void backtrack(int beta)
+void erase(int d)
 {
     for (int i=1; i<=n; ++i)
-        if (decision_level[i] > beta)
-            var_status[i] = 0, decision_level[i]=-1, antecedent[i]=0, unassigned_vars.insert(i);
+        if (decision_level[i] == d)
+            var_status[i] = 0, decision_level[i] = -1, antecedent[i]=0;
+}
+
+bool search(int d, int& beta)
+{
+    int x = pick_branching_variable();
+    if (x == 0) return true;
+
+    decision_level[mod(x)] = d;
+    assert(assign(x));
+
+    while (1) {
+        if (unit_propagation()) {
+            if (search(d+1, beta)) return true;
+            else if (beta != d) {backtrack(d); return false;}
+        }
+        if (not conflict_analysis(d, beta)) {backtrack(d); return false;}
+        backtrack(d);
+    }
 }
 
 bool CDCL()
 {
     if (not unit_propagation())
         return false;
-
-    int x;
-    while ((x = pick_branching_variable())!=0) {
-#ifdef DEBUG
-        cout<<"Branching on: "<<x<<endl;
-#endif
-        decision_level[mod(x)]=++dl;
-        assign(x);
-        while (not unit_propagation()) {
-#ifdef DEBUG
-            cout<<"BCP failure"<<endl;
-#endif
-            if (dl == 0) return false;
-            auto beta = conflict_analysis();
-#ifdef DEBUG
-            cout<<"Conflict. Backtracking to "<<beta<<" from "<<dl<<endl;
-#endif
-            backtrack(beta);
-            dl = beta;
-        }
-    }
-
+    
+    if (not search(0, beta)) return false;
     return true;
 }
 
