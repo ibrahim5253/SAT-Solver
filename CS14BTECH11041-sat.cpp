@@ -3,11 +3,12 @@
 #define pb push_back
 #define ff first
 #define ss second
+#define mp make_pair
 
-#define DEBUG
+//#define DEBUG
 
 int const N = 501;
-int const M = 10001;
+int const M = 1e6;
 
 #define kappa 0
 
@@ -16,30 +17,18 @@ using vi=vector<int>;
 using pii=pair<int, int>;
 
 vector<vi> clauses;
-vector<pii> watchers;
+int num_active[M];
+vector<vi> present_in(N, vi());
 
-int literal_count[N][2];
-
-bool foo(int a, int b)
-{
-    return max(literal_count[a][0], literal_count[a][1]) > max(literal_count[b][0], literal_count[b][1]);
-}
 
 int var_status[N];
 int decision_level[N];
 int antecedent[N];
-set<int> being_watched[N][2];
-unordered_set<int> implied_literals;
-int dl=0; // current decision level
-set<int, bool(*)(int,int)> unassigned_vars(foo);
 
 int n, m;
 
 inline unsigned int mod(int v)
 {
-/*    int const mask = v >> sizeof(int)*sizeof(char)-1;
-    return (v^mask)-mask;
-    */
     return abs(v);
 }
 
@@ -55,8 +44,7 @@ void input()
     string p, _cnf;
     ss>>p>>_cnf>>n>>m;
 
-    clauses.resize(m+1, vi()),
-    watchers.resize(m+1, pii());
+    clauses.resize(m+1, vi());
 
     for (int i=1; i<=m; ++i) {
         getline(cin,s);
@@ -65,16 +53,11 @@ void input()
         int j; ss>>j;
         while(j!=0) {
             clauses[i].pb(j);
+            present_in[mod(j)].pb(j>0?i:-i);
             ss>>j;
-            ++literal_count[mod(j)][j>0];
         }
-        watchers[i] = {0, clauses[i].size()-1};
-        auto f=clauses[i].front(), b=clauses[i].back();
-        being_watched[mod(f)][f>0].insert(i);
-        being_watched[mod(b)][b>0].insert(i);
 
-        if (clauses[i].size() == 1)
-            implied_literals.insert(f);
+        num_active[i] = clauses[i].size();
     }
 
     for (int i=1; i<=n; ++i)
@@ -88,108 +71,71 @@ void print_clause(int c)
     cout<<endl;
 }
 
-bool assign(int x)
+int get_active_literal(int i)
 {
-#ifdef DEBUG
-    cout<<"Assigning literal "<<x<<endl;
-#endif
-    var_status[mod(x)] = (x>0?1:-1);
-    auto affected_clauses = being_watched[mod(x)][x<0];
-
-    bool flag=true;
-    for (auto& c: affected_clauses) {
-
-#ifdef DEBUG
-        cout<<"Clause "<<c<<" has been affected:";print_clause(c);
-#endif
-        int &p1=watchers[c].ff, &p2=watchers[c].ss;
-        int k = clauses[c].size();
-        auto& cl = clauses[c];
-        
-        /*
-        if (var_status[mod(cl[p1])]*cl[p1] < 0 and var_status[mod(cl[p2])]*cl[p2] < 0) {
-        }
-        */
-        if (cl[p1]==-x) {
-            p1=(p2+1)%k;
-            while (p1!=p2 and var_status[mod(cl[p1])]*cl[p1] < 0)
-                p1=(p1+1)%k;
-        }
-        else {
-            p2=(p1+1)%k;
-            while (p1!=p2 and var_status[mod(cl[p2])]*cl[p2] < 0)
-                p2=(p2+1)%k;
-        }
-
-        if (p1==p2) {
-            if (var_status[mod(cl[p1])]==0) {
-#ifdef DEBUG
-                cout<<"Clause "<<c<<" is unit. "<<cl[p1]<<" is implied."<<endl;
-#endif
-                implied_literals.insert(cl[p1]), antecedent[mod(cl[p1])]=c;
-            }
-            else if (var_status[mod(cl[p1])]*cl[p1] < 0) {
-#ifdef DEBUG
-                cout<<"Clause "<<c<<" is null"<<endl;
-#endif
-                antecedent[kappa] = c;
-                flag = false;
-            }
-            p1=(p2+1)%k;
-        }
-
-        being_watched[mod(x)][x<0].erase(c);
-        being_watched[mod(cl[p1])][cl[p1]>0].insert(c);
-        being_watched[mod(cl[p2])][cl[p2]>0].insert(c);
-
-        if (flag==false) return false;
-#ifdef DEBUG
-        cout<<"P1 points to "<<cl[p1]<<endl;
-        cout<<"P2 points to "<<cl[p2]<<endl;
-#endif
-    }
-    return flag;
+    for (auto& l : clauses[i])
+        if (var_status[mod(l)]*l >= 0) return l;
 }
 
-bool unit_propagation()
+bool unit_propagation(int d)
 {
-    while (!implied_literals.empty()) {
-        auto x = *implied_literals.begin();
-        implied_literals.erase(implied_literals.begin());
-
-        decision_level[mod(x)]=0;
-        for (auto& l: clauses[antecedent[mod(x)]]) {
-            if (l!=x)
-                decision_level[mod(x)] = max(decision_level[mod(x)], decision_level[mod(l)]);
+    queue<pii> q;
+    bool seen[N]{false};
+    for  (int i=1; i<=m; ++i) {
+        if (num_active[i] == 0) {
+            antecedent[kappa]=i;
+            return false;
         }
-
-        //cout<<"Decision level of "<<x<<": "<<decision_level[mod(x)]<<endl;
-
-        if (!assign(x)) {
-            implied_literals.clear();return false;
+        else if (num_active[i] == 1) {
+            int l = get_active_literal(i);
+            if (var_status[mod(l)] == 0 and not seen[mod(l)])
+                q.push(mp(l, i)), seen[mod(l)]=true;
         }
+    }
+
+    while (not q.empty()) {
+        auto p = q.front();
+        q.pop();
+
+        int x = p.ff, omega = p.ss;
+        var_status[mod(x)] = (x > 0 ? 1 : -1);
+        decision_level[mod(x)] = d;
+        antecedent[mod(x)] = omega;
+
+        //cout<<"Assigned "<<x<<endl;
+
+        bool f=true;
+
+        for (auto& c: present_in[mod(x)])  
+            if (c * x < 0) {
+                --num_active[mod(c)];
+        //        cout<<"Clause "<<mod(c)<<": ",print_clause(mod(c)),cout<<";affected. Num active: "<<num_active[mod(c)]<<endl;
+                if (num_active[mod(c)] == 0) {
+                    antecedent[kappa] = mod(c);
+                    f=false;
+                }
+                if (num_active[mod(c)] == 1) {
+                    int l = get_active_literal(mod(c));
+                    if (var_status[mod(l)] == 0 and not seen[mod(l)])
+                        q.push(mp(l, mod(c))), seen[mod(l)]=true;
+                }
+            } 
+        if (!f) return false;
     }
     return true;
 }
 
 int pick_branching_variable()
 {
-    /*
-    if (unassigned_vars.empty()) return 0;
-    auto x = *unassigned_vars.begin();
-    if (literal_count[x][0] > literal_count[x][1])
-        return -x;
-    return x;
-    */
     for (int i=1; i<=n; ++i)
         if (var_status[i] == 0) return i;
     return 0;
 }
 
-int conflict_analysis()
+bool conflict_analysis(int dl, int& beta)
 {
     queue<int> q;
-    bool vis[N]{};
+    bool vis[N]{false};
     unordered_set<int> learned_clause;
 #ifdef DEBUG
     cout<<"Conflicting clause, "<<antecedent[kappa]<<":";
@@ -200,8 +146,8 @@ int conflict_analysis()
     for (auto l: clauses[antecedent[kappa]]) 
         if (decision_level[mod(l)] < dl or antecedent[mod(l)]==0)
             learned_clause.insert(l);
-        else
-            vis[mod(l)]=true, q.push(l);
+        else 
+            assert(!vis[mod(l)]), vis[mod(l)]=true, q.push(l);
 
     while (!q.empty()) {
 
@@ -218,47 +164,44 @@ int conflict_analysis()
     
     vi new_clause(learned_clause.begin(), learned_clause.end());    
     clauses.pb(new_clause);
-
-    int p1 = 0, p2 = new_clause.size()-1; 
+    ++m;
 
     int c_idx = clauses.size()-1;
+    num_active[c_idx] = 0;
 
-    int beta = -1, max_dl = -1;
+    beta = -1;
 
-    for (auto i = 0; i<new_clause.size(); ++i) {
-        auto l = new_clause[i];
-        ++literal_count[mod(l)][l>0];
-        if (decision_level[mod(l)] > max_dl) beta = max_dl, max_dl = decision_level[mod(l)];
-        else if (decision_level[mod(l)] < max_dl) beta = max(beta, decision_level[mod(l)]);
+    for (auto& l : new_clause)
+        present_in[mod(l)].pb(l>0?c_idx:-c_idx),
+        beta = max(beta, decision_level[mod(l)]);    
 
-        if (decision_level[mod(l)] == dl) {
-            implied_literals.insert(l), p1=i, antecedent[mod(l)]=c_idx, decision_level[mod(l)]=-1;
-         //   cout<<"Antecedent of "<<l<<", "<<c_idx<<":",print_clause(c_idx);
-        }
-    }
-
-    if (p1==p2) p1 = (p2+1)%new_clause.size();
-
-    being_watched[mod(new_clause[p1])][new_clause[p1]>0].insert(c_idx);
-    being_watched[mod(new_clause[p2])][new_clause[p2]>0].insert(c_idx);
-
-    watchers.pb({p1, p2});
-
-#ifdef DEBUG 
-    cout<<"New clause learnt:";
+    /*
+    cout<<"New clause learnt: "<<c_idx<<":";
     for (auto &l : new_clause)
         cout<<" "<<l;
     cout<<endl;
-#endif
-    if (beta == -1) return max_dl - 1;
-    return beta;
+    */
+
+    if (beta != dl) {
+        antecedent[kappa] = c_idx;
+        return false;
+    }
+    return true;
 }
 
-void erase(int d)
+void backtrack(int d)
 {
-    for (int i=1; i<=n; ++i)
-        if (decision_level[i] == d)
-            var_status[i] = 0, decision_level[i] = -1, antecedent[i]=0;
+    for (int i=1; i<=n; ++i) {
+        if (decision_level[i] == d) {
+            int x = var_status[i];
+            for (auto& c: present_in[i])
+                if (c*x < 0) 
+                    ++num_active[mod(c)],
+            var_status[i]=0;
+            decision_level[i]=-1;
+            antecedent[i]=0;
+        }
+    }
 }
 
 bool search(int d, int& beta)
@@ -267,10 +210,15 @@ bool search(int d, int& beta)
     if (x == 0) return true;
 
     decision_level[mod(x)] = d;
-    assert(assign(x));
+    var_status[mod(x)] = (x > 0 ? 1 : -1);
+    for (auto& c: present_in[mod(x)])
+        if (c*x < 0) {
+            --num_active[mod(c)];
+        }
+
 
     while (1) {
-        if (unit_propagation()) {
+        if (unit_propagation(d)) {
             if (search(d+1, beta)) return true;
             else if (beta != d) {backtrack(d); return false;}
         }
@@ -281,11 +229,11 @@ bool search(int d, int& beta)
 
 bool CDCL()
 {
-    if (not unit_propagation())
+    if (not unit_propagation(0))
         return false;
     
-    if (not search(0, beta)) return false;
-    return true;
+    int beta;
+    return search(1, beta);
 }
 
 int main()
@@ -297,6 +245,7 @@ int main()
             cout<<i*var_status[i]<<(i<n?" ":"");
     }
     else cout<<"UNSAT";
+    cout<<"number of clauses:"<<m<<endl;
     cout<<"\n";
     return 0;
 }
