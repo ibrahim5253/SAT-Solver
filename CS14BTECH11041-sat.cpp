@@ -127,27 +127,32 @@ bool unit_propagation(int d)
 
 int pick_branching_variable()
 {
+    int x = 0;
     for (int i=1; i<=n; ++i)
-        if (var_status[i] == 0) return i;
-    return 0;
+        if (var_status[i] == 0 and present_in[i].size() > present_in[x].size()) 
+            x = i;
+    return x;
 }
 
 bool conflict_analysis(int dl, int& beta)
 {
     queue<int> q;
     bool vis[N]{false};
-    unordered_set<int> learned_clause;
+    vi learned_clause;
 #ifdef DEBUG
     cout<<"Conflicting clause, "<<antecedent[kappa]<<":";
     for (auto l: clauses[antecedent[kappa]])
         cout<<" "<<l;
     cout<<endl;
 #endif
-    for (auto l: clauses[antecedent[kappa]]) 
+    for (auto l: clauses[antecedent[kappa]]) {
+        if (vis[mod(l)]) continue;
         if (decision_level[mod(l)] < dl or antecedent[mod(l)]==0)
-            learned_clause.insert(l);
+            learned_clause.pb(l);
         else 
-            assert(!vis[mod(l)]), vis[mod(l)]=true, q.push(l);
+            q.push(l);
+        vis[mod(l)] = true;
+    }
 
     while (!q.empty()) {
 
@@ -155,15 +160,16 @@ bool conflict_analysis(int dl, int& beta)
         q.pop();
 
         for (auto l: clauses[antecedent[mod(x)]]) {
+            if (vis[mod(l)]) continue;
             if (decision_level[mod(l)] < dl or antecedent[mod(l)]==0)
-                learned_clause.insert(l);
-            else if (!vis[mod(l)]) 
-                vis[mod(l)]=true, q.push(l);
+                learned_clause.pb(l);
+            else 
+                q.push(l);
+            vis[mod(l)]=true; 
         }
     }
     
-    vi new_clause(learned_clause.begin(), learned_clause.end());    
-    clauses.pb(new_clause);
+    clauses.pb(learned_clause);
     ++m;
 
     int c_idx = clauses.size()-1;
@@ -171,7 +177,7 @@ bool conflict_analysis(int dl, int& beta)
 
     beta = -1;
 
-    for (auto& l : new_clause)
+    for (auto& l : learned_clause)
         present_in[mod(l)].pb(l>0?c_idx:-c_idx),
         beta = max(beta, decision_level[mod(l)]);    
 
