@@ -5,10 +5,8 @@
 #define ss second
 #define mp make_pair
 
-//#define DEBUG
-
-int const N = 501;
-int const M = 1e6;
+int const N = 1000;
+int const M = 1e7;
 
 #define kappa 0
 
@@ -102,14 +100,11 @@ bool unit_propagation(int d)
         decision_level[mod(x)] = d;
         antecedent[mod(x)] = omega;
 
-        //cout<<"Assigned "<<x<<endl;
-
         bool f=true;
 
         for (auto& c: present_in[mod(x)])  
             if (c * x < 0) {
                 --num_active[mod(c)];
-        //        cout<<"Clause "<<mod(c)<<": ",print_clause(mod(c)),cout<<";affected. Num active: "<<num_active[mod(c)]<<endl;
                 if (num_active[mod(c)] == 0) {
                     antecedent[kappa] = mod(c);
                     f=false;
@@ -139,12 +134,6 @@ bool conflict_analysis(int dl, int& beta)
     queue<int> q;
     bool vis[N]{false};
     vi learned_clause;
-#ifdef DEBUG
-    cout<<"Conflicting clause, "<<antecedent[kappa]<<":";
-    for (auto l: clauses[antecedent[kappa]])
-        cout<<" "<<l;
-    cout<<endl;
-#endif
     for (auto l: clauses[antecedent[kappa]]) {
         if (vis[mod(l)]) continue;
         if (decision_level[mod(l)] < dl or antecedent[mod(l)]==0)
@@ -180,14 +169,6 @@ bool conflict_analysis(int dl, int& beta)
     for (auto& l : learned_clause)
         present_in[mod(l)].pb(l>0?c_idx:-c_idx),
         beta = max(beta, decision_level[mod(l)]);    
-
-    /*    
-    cout<<"New clause learnt: "<<c_idx<<":";
-    for (auto &l : new_clause)
-        cout<<" "<<l;
-    cout<<endl;
-    */
-   
 
     if (beta != dl) {
         antecedent[kappa] = c_idx;
@@ -249,10 +230,9 @@ int main()
     if (CDCL()) {
         cout<<"SAT\n";
         for (int i=1; i<=n; ++i)
-            cout<<i*var_status[i]<<(i<n?" ":"");
+            cout<<i*var_status[i]<<" ";
+        cout<<"0";
     }
     else cout<<"UNSAT";
-    cout<<"number of clauses:"<<m<<endl;
-    cout<<"\n";
     return 0;
 }
