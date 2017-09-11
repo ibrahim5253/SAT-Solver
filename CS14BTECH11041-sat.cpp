@@ -175,12 +175,13 @@ bool conflict_analysis(int dl, int& beta)
         present_in[mod(l)].pb(l>0?c_idx:-c_idx),
         beta = max(beta, decision_level[mod(l)]);    
 
-    /*
+    /*    
     cout<<"New clause learnt: "<<c_idx<<":";
     for (auto &l : new_clause)
         cout<<" "<<l;
     cout<<endl;
     */
+   
 
     if (beta != dl) {
         antecedent[kappa] = c_idx;
@@ -222,7 +223,7 @@ bool search(int d, int& beta)
             if (search(d+1, beta)) return true;
             else if (beta != d) {backtrack(d); return false;}
         }
-        if (not conflict_analysis(d, beta)) {backtrack(d); return false;}
+        else if (not conflict_analysis(d, beta)) {backtrack(d); return false;}
         backtrack(d);
     }
 }
